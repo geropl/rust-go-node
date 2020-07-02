@@ -13,9 +13,9 @@ pub extern "C" fn concat_strs(a: *const libc::c_char, b: *const libc::c_char) ->
 
     let cstring = result.map(|r| CString::new(r.as_bytes()).ok());
     match cstring {
-        None => std::ptr::null_mut(),
-        Some(None) => std::ptr::null_mut(),
-        Some(Some(c)) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+        Ok(None) => std::ptr::null_mut(),
+        Ok(Some(c)) => c.into_raw(),
     }
 }
 

@@ -1,9 +1,19 @@
+use thiserror::Error;
+
+
+
+
+#[derive(Error, Debug)]
+pub enum ConcatenateStringsError {
+    #[error("could not concatenate strings, one or more arguments were empty")]
+    ArgumentsEmtpy{}
+}
+
 /// Concatenates two strings
-pub fn concatenate_strings(a: &Option<&str>, b: &Option<&str>) -> Option<String> {
+pub fn concatenate_strings(a: &Option<&str>, b: &Option<&str>) -> Result<String, ConcatenateStringsError> {
     match (a, b) {
-        (Some(a), Some(b)) => Some(format!("{}{}", a, b)),
-        (None, _) => None,
-        (_, None) => None,
+        (Some(a), Some(b)) => Ok(format!("{}{}", a, b)),
+        (_, _) => Err(ConcatenateStringsError::ArgumentsEmtpy{}),
     }
 }
 
