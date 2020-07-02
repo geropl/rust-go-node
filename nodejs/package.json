@@ -1,0 +1,19 @@
+{
+    "name": "nodejs",
+    "version": "1.0.0",
+    "main": "main.js",
+    "license": "MIT",
+    "private": true,
+    "scripts": {
+        "start": "node dist/main.js",
+        "build": "tsc",
+        "watch": "tsc -w"
+    },
+    "dependencies": {
+        "rust-lib-wasm": "0.1.0"
+    },
+    "devDependencies": {
+        "typescript": "^3.9.6",
+        "@types/node": "^10.14.8"
+    }
+}

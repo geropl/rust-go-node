@@ -1,0 +1,10 @@
+{
+    "private": true,
+    "license": "MIT",
+    "workspaces": {
+        "packages": [
+            "rust-lib-wasm/pkg",
+            "nodejs"
+        ]
+    }
+}

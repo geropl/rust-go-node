@@ -1,7 +1,7 @@
 package main
 
 /*
-#cgo LDFLAGS: -L./lib -lrust
+#cgo LDFLAGS: -L./lib -lrust_lib_ffi
 #include "./lib/librust.h"
 */
 import "C"
