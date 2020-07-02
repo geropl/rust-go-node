@@ -1,3 +1,4 @@
+use rust_lib;
 use libc;
 use std::ffi::{CStr, CString};
 
@@ -5,22 +6,22 @@ use std::ffi::{CStr, CString};
 /// Concatenates two strings, or null on error
 #[no_mangle]
 pub extern "C" fn concat_strs(a: *const libc::c_char, b: *const libc::c_char) -> *mut libc::c_char {
-    let (mut a, b) = match (c_char_to_string(a), c_char_to_string(b)) {
-        (Ok(sa), Ok(sb)) => (sa, sb),
-        (Err(_), _) => return std::ptr::null_mut(),
-        (_, Err(_)) => return std::ptr::null_mut(),
-    };
-    a.push_str(&b);
-    
-    match CString::new(a.as_bytes()) {
-        Ok(c) => c.into_raw(),
-        Err(_) => std::ptr::null_mut(),
+    let (a, b) = (c_char_to_string(a), c_char_to_string(b));
+
+    // Use library to perform actual concatenation
+    let result = rust_lib::concatenate_strings(&a.as_deref(), &b.as_deref());
+
+    let cstring = result.map(|r| CString::new(r.as_bytes()).ok());
+    match cstring {
+        None => std::ptr::null_mut(),
+        Some(None) => std::ptr::null_mut(),
+        Some(Some(c)) => c.into_raw(),
     }
 }
 
-fn c_char_to_string(c_char: *const libc::c_char) -> Result<String, std::string::FromUtf8Error> {
+fn c_char_to_string(c_char: *const libc::c_char) -> Option<String> {
     let buf = unsafe { CStr::from_ptr(c_char).to_bytes() };
-    String::from_utf8(buf.to_vec())
+    String::from_utf8(buf.to_vec()).ok()
 }
 
 /// Frees CStrings formerly created in Rust code

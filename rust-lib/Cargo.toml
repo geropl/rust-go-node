@@ -1,0 +1,7 @@
+[package]
+name = "rust-lib"
+version = "0.1.0"
+authors = ["Gero Posmyk-Leinemann <gero.posmyk-leinemann@typefox.io>"]
+edition = "2018"
+
+[dependencies]

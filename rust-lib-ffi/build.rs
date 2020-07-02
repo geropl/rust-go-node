@@ -4,13 +4,13 @@ use std::io;
 use std::process::Command;
 
 fn main() -> io::Result<()> {
-    clear_headers()?;
+    clear_headers_dir()?;
 
     // generate new headers
-    // cbindgen --config cbindgen.toml --crate rust --output librust.h --lang c
+    // cbindgen --config cbindgen.toml --crate rust-lib-ffi --output librust.h --lang c
     Command::new("cbindgen")
         .args(&["--config", "cbindgen.toml"])
-        .args(&["--crate", "rust"])
+        .args(&["--crate", "rust-lib-ffi"])
         .args(&["--output", "./headers/librust.h"])
         .args(&["--lang", "c"])
         .status()?;
@@ -19,7 +19,7 @@ fn main() -> io::Result<()> {
 }
 
 /// clears headers directory without deleting it from git
-fn clear_headers() -> io::Result<()> {
+fn clear_headers_dir() -> io::Result<()> {
     let headers_dir = path::PathBuf::from("./headers");
     for entry in fs::read_dir(headers_dir)? {
         let e = entry?;
