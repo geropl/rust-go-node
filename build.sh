@@ -2,7 +2,12 @@
 
 cargo build --release;
 
-# move headers + lib rust -> go
+# generate wasm
+pushd rust-lib-wasm;
+wasm-pack build --target nodejs;
+popd;
+
+# move FFI headers + lib rust -> go
 mkdir go/lib
 rm -rf go/lib/*
 cp rust-lib-ffi/target/release/librust.so go/lib/
