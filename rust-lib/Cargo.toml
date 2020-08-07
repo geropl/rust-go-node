@@ -4,5 +4,28 @@ version = "0.1.0"
 authors = ["Gero Posmyk-Leinemann <gero.posmyk-leinemann@typefox.io>"]
 edition = "2018"
 
+[lib]
+name = "licensorlib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "licensor"
+path = "src/bin.rs"
+
 [dependencies]
+# error handling
 thiserror = "1.0.20"
+anyhow = "1.0.32"
+
+# JSON deserialization
+serde = { package = "serde", version = "^1.0", default-features = false, features = ["derive"] }
+serde_json = { package = "serde_json", version = "^1.0" }
+
+# certificates
+sha2 = "0.9.1"
+rsa = { git = "https://github.com/RustCrypto/RSA", rev = "e8152949f921fdb24efbeb0c27cba5bccfc8d4fc" }
+rand = "0.7.3"
+base64 = "0.12.3"
+
+# cli (use unreleased v3.0.0)
+clap = { git = "https://github.com/clap-rs/clap/", rev = "bbb14f8bd47ef201b315d367922343577ee60718" }
