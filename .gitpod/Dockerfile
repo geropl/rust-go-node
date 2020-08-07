@@ -1,7 +1,7 @@
 FROM gitpod/workspace-full:latest
 
 # FFI
-RUN bash -c "cargo install cbindgen"
+RUN bash -lc "cargo install cbindgen"
 
 # wasm
-RUN bash -c "cargo install wasm-pack"
+RUN bash -lc "cargo install wasm-pack"
