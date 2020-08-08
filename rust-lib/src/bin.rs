@@ -8,14 +8,12 @@ use std::path::PathBuf;
 use clap::Clap;
 #[macro_use]
 extern crate anyhow;
-
 use rsa::{pem, RSAPrivateKey, RSAPublicKey};
 
 
 #[derive(Clap)]
 #[clap(
     name = "licensor",
-    version = "0.1.0",
     about = "CLI for signing licenses"
 )]
 struct Root {
@@ -35,21 +33,31 @@ enum SubCmd {
         about = "Signs a license"
     )]
     Sign(SignParams),
+    #[clap(
+        name = "validate",
+        about = "Validates a license - reads from stdin if no argument is provided"
+    )]
+    Validate(ValidateParams),
 }
 
 #[derive(Clap)]
 struct SignParams {
+    // All those #[clap(long)] make "domain" -> "--domain" to be compatible to the Go version
+
     /// domain for which the license is valid
+    #[clap(long)]
     domain: String,
 
     /// ID of the license
+    #[clap(long)]
     id: String,
 
     /// license level, must be one of team, enterprise
+    #[clap(long)]
     level: String,
 
     /// number of seats the license is valid for
-    #[clap(default_value = "5")]
+    #[clap(long, default_value = "5")]
     seats: i32,
 
     /// path to the private key to sign the license with
@@ -61,6 +69,16 @@ struct SignParams {
     valid_for: std::time::Duration
 }
 
+#[derive(Clap)]
+struct ValidateParams {
+    /// the license to validate. Reads from stdin if not provided
+    license: Option<String>,
+
+    /// domain to evaluate the license against
+    #[clap(long)]
+    domain: String,
+}
+
 fn parse_duration(valid_for: &str) -> Result<std::time::Duration, std::num::ParseIntError> {
     let secs = u64::from_str_radix(valid_for, 10)?;
     Ok(std::time::Duration::from_secs(secs))
@@ -69,37 +87,10 @@ fn parse_duration(valid_for: &str) -> Result<std::time::Duration, std::num::Pars
 fn main() -> Result<(), anyhow::Error> {
     let root: Root = Root::parse();
     match root.subcmd {
-        SubCmd::Sign(params) => sign(params),
         SubCmd::GenKey{} => genkey(),
+        SubCmd::Sign(params) => sign(params),
+        SubCmd::Validate(params) => validate(params),
     }
-}
-
-fn sign(params: SignParams) -> Result<(), anyhow::Error> {
-    // read and parse private key from file
-    let fc = fs::read_to_string(params.key)?;
-    let pem = pem::parse(fc.as_bytes())?;
-    if pem.tag != "PRIVATE KEY" { // !!! We use a PKCS8 header but PKCS1 content
-        return Err(anyhow!(format!("unknown PEM block type {}", pem.tag)));
-    }
-    let private_key = RSAPrivateKey::from_pkcs1(&pem.contents)?;
-
-    // construct license
-    let level = lib::LicenseLevel::try_from(params.level)?;
-    let _valid_until = Instant::now().checked_add(params.valid_for)
-        .ok_or_else(|| anyhow!("Error calculating valid_until"))?;
-    let license = lib::License {
-        domain: params.domain,
-        id: params.id,
-        seats: params.seats,
-        level,
-        valid_until: "".to_string(),       // TODO serde for Instant!
-    };
-    
-    // sign
-    let result = lib::sign(&license, &private_key)?;
-
-    println!("{}", result.encode());
-    Ok(())
 }
 
 fn genkey() -> Result<(), anyhow::Error> {
@@ -132,6 +123,54 @@ fn genkey() -> Result<(), anyhow::Error> {
         pem::encode(&pem)
     };
     fs::write(PathBuf::from("public_key.pem"), encoded_public_key)?;
+
+    Ok(())
+}
+
+fn sign(params: SignParams) -> Result<(), anyhow::Error> {
+    // read and parse private key from file
+    let fc = fs::read_to_string(params.key)?;
+    let pem = pem::parse(fc.as_bytes())?;
+    if pem.tag != "PRIVATE KEY" { // !!! We use a PKCS8 header but PKCS1 content
+        return Err(anyhow!("unknown PEM block type {}", pem.tag));
+    }
+    let private_key = RSAPrivateKey::from_pkcs1(&pem.contents)?;
+
+    // construct license
+    let level = lib::LicenseLevel::try_from(params.level)?;
+    let _valid_until = Instant::now().checked_add(params.valid_for)
+        .ok_or_else(|| anyhow!("error calculating valid_until"))?;
+    let license = lib::License {
+        domain: params.domain,
+        id: params.id,
+        seats: params.seats,
+        level,
+        valid_until: "".to_string(),       // TODO serde for Instant!
+    };
+    
+    // sign
+    let result = lib::sign(&license, &private_key)?;
+
+    println!("{}", result.encode());
+    Ok(())
+}
+
+fn validate(params: ValidateParams) -> Result<(), anyhow::Error> {
+    let license_str = match params.license {
+        Some(license_str) => license_str,
+        None => {
+            use std::io::{stdin, Read};
+
+            let mut buffer = String::new();
+            stdin().read_to_string(&mut buffer)?;
+            buffer
+        }
+    };
+
+    let evaluator = lib::Evaluator::from_license_key_bytes(license_str.as_bytes())?;
+    evaluator.validate(params.domain.as_str())?;
+
+    println!("{:?}", evaluator.inspect());
 
     Ok(())
 }

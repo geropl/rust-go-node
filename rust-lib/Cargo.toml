@@ -29,3 +29,6 @@ base64 = "0.12.3"
 
 # cli (use unreleased v3.0.0)
 clap = { git = "https://github.com/clap-rs/clap/", rev = "bbb14f8bd47ef201b315d367922343577ee60718" }
+
+# needed for non-trivial static initializations until Rust has it's compile-time evaluation beefed up
+lazy_static = "1.4.0"
