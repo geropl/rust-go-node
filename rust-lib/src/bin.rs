@@ -151,7 +151,7 @@ fn sign(params: SignParams) -> Result<(), anyhow::Error> {
     // sign
     let result = lib::sign(&license, &private_key)?;
 
-    println!("{}", result.encode());
+    println!("{}", result.serialize()?);
     Ok(())
 }
 
@@ -167,8 +167,8 @@ fn validate(params: ValidateParams) -> Result<(), anyhow::Error> {
         }
     };
 
-    let evaluator = lib::Evaluator::from_license_key_bytes(license_str.as_bytes())?;
-    evaluator.validate(params.domain.as_str())?;
+    let evaluator = lib::Evaluator::from_license_key_bytes(license_str.as_bytes(), params.domain.as_str())?;
+    evaluator.validate()?;
 
     println!("{:?}", evaluator.inspect());
 
