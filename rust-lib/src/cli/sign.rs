@@ -1,11 +1,11 @@
 use licensorlib as lib;
 
 use std::convert::TryFrom;
-use std::time::Instant;
 use std::fs;
 
 use clap::Clap;
 use rsa::{pem, RSAPrivateKey};
+use chrono::Utc;
 
 #[derive(Clap)]
 pub struct SignParams {
@@ -31,14 +31,14 @@ pub struct SignParams {
     #[clap(short = "k")]
     key: String,
 
-    /// time the license is valid for (defaults to one year or 365*24*60*60 seconds)
-    #[clap(long = "valid-for", default_value = "31536000", parse(try_from_str = parse_duration))]
-    valid_for: std::time::Duration
+    /// days the license is valid for (defaults to one year or 365 days)
+    #[clap(long = "valid-for", default_value = "365", parse(try_from_str = parse_duration))]
+    valid_for: chrono::Duration
 }
 
-fn parse_duration(valid_for: &str) -> Result<std::time::Duration, std::num::ParseIntError> {
-    let secs = u64::from_str_radix(valid_for, 10)?;
-    Ok(std::time::Duration::from_secs(secs))
+fn parse_duration(valid_for: &str) -> Result<chrono::Duration, std::num::ParseIntError> {
+    let days = i64::from_str_radix(valid_for, 10)?;
+    Ok(chrono::Duration::days(days))
 }
 
 pub fn sign(params: SignParams) -> Result<(), anyhow::Error> {
@@ -52,14 +52,14 @@ pub fn sign(params: SignParams) -> Result<(), anyhow::Error> {
 
     // construct license
     let level = lib::LicenseLevel::try_from(params.level)?;
-    let _valid_until = Instant::now().checked_add(params.valid_for)
+    let valid_until = Utc::now().checked_add_signed(params.valid_for)
         .ok_or_else(|| anyhow!("error calculating valid_until"))?;
     let license = lib::License {
         domain: params.domain,
         id: params.id,
-        seats: params.seats,
+        seats: Some(params.seats),
         level,
-        valid_until: "".to_string(),       // TODO serde for Instant!
+        valid_until,
     };
     
     // sign

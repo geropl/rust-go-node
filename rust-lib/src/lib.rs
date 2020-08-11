@@ -1,7 +1,6 @@
 mod keys;
 
 use std::collections::HashMap;
-use std::time::Duration;
 
 use serde::{Serialize, Deserialize};
 use sha2::{Sha256, Digest};
@@ -11,6 +10,7 @@ use rsa::padding::PaddingScheme;
 extern crate anyhow;
 #[macro_use]
 extern crate lazy_static;
+use chrono::{DateTime, Utc, Duration};
 
 #[derive(Clone, Debug)]
 #[derive(Deserialize, Serialize)]   // json
@@ -62,8 +62,8 @@ struct Allowance {
     features: Vec<Feature>,
 
 	// Total prebuild time that can be used at a certain level.
-	// If zero the prebuild time is unlimited.
-    prebuild_time: Duration,
+	// If None the prebuild time is unlimited.
+    prebuild_time: Option<Duration>,
 }
 
 impl Allowance {
@@ -76,13 +76,13 @@ impl Allowance {
 lazy_static!{
     static ref ALLOWANCE_MAP: HashMap<LicenseLevel, Allowance> = vec![
         (LicenseLevel::Team, Allowance {
-            prebuild_time: Duration::from_secs(50 * 60 * 60),   // 50h
+            prebuild_time: Some(Duration::hours(50)),
             features: vec![
                 Feature::Prebuild,
             ],
         }),
         (LicenseLevel::Enterprise, Allowance {
-            prebuild_time: Duration::from_secs(0),
+            prebuild_time: None,
             features: vec![
                 Feature::Prebuild,
 
@@ -95,20 +95,19 @@ lazy_static!{
     ].into_iter().collect();
 }
 
-/// It would be more rust-y to have domain, valid_until and seats as Option<...>, but for now keep it for being backwards compatible
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct License {
     pub id: String,
-
-    /// "" means: no restriction
-    pub domain: String,
     pub level: LicenseLevel,
 
-    /// "" means: no restriction
-    pub valid_until: String,    //std::time::Instant,
+    /// None means: no restriction
+    pub domain: String,
 
-	/// seats == 0 means there's no seat limit
-    pub seats: i32,
+    /// None means: no restriction
+    pub valid_until: DateTime<Utc>,
+
+	/// None means: there's no seat limit
+    pub seats: Option<i32>,
 }
 
 lazy_static!{
@@ -117,8 +116,10 @@ lazy_static!{
         level: LicenseLevel::Team,
         // Seats, Domain, ValidUntil are free for all
         domain: "".to_string(),
-        seats: 0,
-        valid_until: "".to_string(),
+        seats: None,
+        valid_until: chrono::DateTime::parse_from_rfc3339("9999-12-31T23:59:59-00:00")
+            .unwrap()
+            .with_timezone(&Utc),
     };
 }
 
@@ -169,6 +170,7 @@ pub fn sign(license: &License, private_key: &RSAPrivateKey) -> Result<SignedLice
     })
 }
 
+/// Evaluator determines what a license allows for
 pub struct Evaluator {
     license: License,
 
@@ -217,7 +219,7 @@ impl Evaluator {
             hasher.finalize()
         };
 
-        // get public keys
+        // get public keys: special case for "test" builds to allow for injection
         #[cfg(test)]
         let public_keys = keys::PUBLIC_KEYS_TEST.lock().unwrap();
         #[cfg(not(test))]
@@ -237,16 +239,15 @@ impl Evaluator {
         }
 
         // validate license's content
-        let domain = self.domain.as_ref()
+        let domain_to_check = self.domain.as_ref()
             .ok_or_else(|| anyhow!("expected domain to be set"))?;
-        if &self.license.domain != domain {
-            return Err(anyhow!("wrong domain ({}), expected {}", self.license.domain, domain));
+        if &self.license.domain != domain_to_check {
+            return Err(anyhow!("wrong domain ({}), expected {}", self.license.domain, domain_to_check));
         }
 
-        // // TODO Instant
-        // if self.license.valid_until.Before(std::time::Instant::now()) {
-        //     return Err(anyhow!("not valid anymore"));
-        // }
+        if self.license.valid_until < Utc::now() {
+            return Err(anyhow!("not valid anymore"));
+        }
 
         Ok(())
     }
@@ -265,10 +266,21 @@ impl Evaluator {
 
     /// returns true if the license supports at least the give amount of seats
     pub fn has_enough_seats(&self, seats: i32) -> bool {
-        self.license.seats == 0
-            || seats <= self.license.seats
+        if self.validate().is_err() {
+            return false;
+        }
+
+        match self.license.seats {
+            None => true,
+            Some(s) => match s {
+                0 => true,
+                s => seats <= s,
+            }
+        }
     }
 
+    /// returns true if the use a prebuild is permissible under the license,
+    /// given the total prebuild time used already.
     pub fn can_use_prebuild(&self, total_prebuild_time_spent: &Duration) -> bool {
         if !self.enabled(&Feature::Prebuild) {
             return false;
@@ -278,17 +290,20 @@ impl Evaluator {
             None => return false,
             Some(a) => a,
         };
-        if allowance.prebuild_time.as_secs() == 0 {
-            // allowed prebuild time == 0 means the prebuild time is not limited
-            return true;
+        match allowance.prebuild_time {
+            None => true,
+            Some(pbt) => {
+                if pbt.is_zero() {
+                    // allowed prebuild time == 0 means the prebuild time is not limited
+                    true
+                } else {
+                    total_prebuild_time_spent <= &pbt
+                }
+            }
         }
-        if total_prebuild_time_spent <= &allowance.prebuild_time {
-            return true;
-        }
-
-        false
     }
 
+    /// returns license information. Use for debugging only!
     pub fn inspect(&self) -> License {
         self.license.clone()
     }
@@ -301,11 +316,11 @@ mod tests {
 
     use rsa::RSAPublicKey;
 
-    use std::time;
+    use chrono::Utc;
 
-    const SOME_SEATS: i32 = 5;
-    const SOME_DOMAIN: &str = "foobar.com";
-    const SOME_ID: &str = "730d5134-768c-4a05-b7cd-ecf3757cada9";
+    static SOME_SEATS: i32 = 5;
+    static SOME_DOMAIN: &str = "foobar.com";
+    static SOME_ID: &str = "730d5134-768c-4a05-b7cd-ecf3757cada9";
 
     struct LicenseTest {
         name: String,
@@ -346,7 +361,7 @@ mod tests {
                         .map_err(|e| anyhow!("cannot sign license: {}", e))?;
                     let serialized = signed_license.serialize()?;
 
-                    Evaluator::from_license_key_bytes(serialized.as_bytes(), SOME_DOMAIN)?
+                    Evaluator::from_license_key_bytes(serialized.as_bytes(), &SOME_DOMAIN)?
                 },
             };
 
@@ -358,7 +373,7 @@ mod tests {
     pub fn seats() -> Result<(), anyhow::Error> {
         struct Test {
             name: String,
-            licensed: i32,
+            licensed: Option<i32>,
             probe: i32,
             within_limits: bool,
             #[allow(dead_code)]
@@ -366,21 +381,21 @@ mod tests {
             invalid_license: bool,
         }
         let tests: Vec<Test> = vec![
-            ("unlimited seats", 0, 1000, true, false, false),
-            ("within limited seats", 50, 40, true, false, false),
-            ("within limited seats (edge)", 50, 50, true, false, false),
-            ("beyond limited seats", 50, 150, false, false, false),
-            ("beyond limited seats (edge)", 50, 51, false, false, false),
-            // ("invalid license", 50, 50, false, false, true), // TODO Instant!
+            ("unlimited seats", Some(0), 1000, true, false, false),
+            ("unlimited seats", None, 1000, true, false, false),
+            ("within limited seats", Some(50), 40, true, false, false),
+            ("within limited seats (edge)", Some(50), 50, true, false, false),
+            ("beyond limited seats", Some(50), 150, false, false, false),
+            ("beyond limited seats (edge)", Some(50), 51, false, false, false),
+            ("invalid license", Some(50), 50, false, false, true),
         ].into_iter()
             .map(|t| Test{ name: t.0.to_string(), licensed: t.1, probe: t.2, within_limits: t.3, default_license: t.4, invalid_license: t.5 })
             .collect();
 
         for test in tests.into_iter() {
-            let six_hours = Duration::from_secs(6 * 60 * 60);
-            let _valid_until = match test.invalid_license {
-                true => time::Instant::now().checked_sub(six_hours),
-                false => time::Instant::now().checked_add(six_hours),
+            let valid_until = match test.invalid_license {
+                true => Utc::now().checked_sub_signed(Duration::hours(6)),
+                false => Utc::now().checked_add_signed(Duration::hours(6)),
             }.ok_or_else(|| anyhow!("error calculating 'valid_until': out of bounds"))?;
 
             let license_test = LicenseTest {
@@ -390,12 +405,12 @@ mod tests {
                     domain: SOME_DOMAIN.to_string(),
                     level: LicenseLevel::Team,
                     seats: test.licensed,
-                    valid_until: "".to_string(),    // TODO Instant
+                    valid_until,
                 }),
                 validate: Box::new(move |evaluator| {
                     let within_limits = evaluator.has_enough_seats(test.probe);
                     if within_limits != test.within_limits {
-                        return Err(anyhow!("'{}': has_enough_seats did not behave as expected: lic={} probe={} expected={} actual={}", test.name, test.licensed, test.probe, test.within_limits, within_limits));
+                        return Err(anyhow!("'{}': has_enough_seats did not behave as expected: lic={:?} probe={} expected={} actual={}", test.name, test.licensed, test.probe, test.within_limits, within_limits));
                     }
                     Ok(())
                 }),
@@ -450,8 +465,8 @@ mod tests {
                     id: SOME_ID.to_string(),
                     domain: SOME_DOMAIN.to_string(),
                     level: test.level.clone(),
-                    seats: SOME_SEATS,
-                    valid_until: "".to_string(),    //time::Instant::now().checked_add(6 * 60 * 60)?,
+                    seats: Some(SOME_SEATS),
+                    valid_until: Utc::now().checked_add_signed(Duration::hours(6)).unwrap(),
                 })
             };
             let license_test = LicenseTest {
@@ -496,30 +511,27 @@ mod tests {
             expected: bool,
         }
 
-        let hours_to_seconds: u64 = 60 * 60;
         let broken_license = License {
             id: "".to_string(),
             domain: "".to_string(),
             level: LicenseLevel::Enterprise,
-            seats: 0,
-            valid_until: "".to_string(),
+            seats: None,
+            valid_until: Utc::now().checked_add_signed(Duration::seconds(0)).unwrap(),
         };
 	    let enterprise_license = License {
-            domain: SOME_DOMAIN.to_string(),
             id: SOME_ID.to_string(),
+            domain: SOME_DOMAIN.to_string(),
             level: LicenseLevel::Enterprise,
-            seats: 0,
-            valid_until: "".to_string(),    //time::Instant::now().checked_add(6 * hours_to_seconds)
+            seats: None,
+            valid_until: Utc::now().checked_add_signed(Duration::hours(6)).unwrap(),
         };
         let tests:Vec<Test> = vec![
-            ("default license ok", None, Duration::from_secs(0), true),
-            ("default license not ok", None, Duration::from_secs(250 * hours_to_seconds), false),
-            #[allow(clippy::identity_op)]
-            ("enterprise license a", Some(enterprise_license.clone()), Duration::from_secs(1 * hours_to_seconds), true),
-            ("enterprise license b", Some(enterprise_license), Duration::from_secs(500 * hours_to_seconds), true),
+            ("default license ok", None, Duration::seconds(0), true),
+            ("default license not ok", None, Duration::hours(250), false),
+            ("enterprise license a", Some(enterprise_license.clone()), Duration::hours(1), true),
+            ("enterprise license b", Some(enterprise_license), Duration::hours(500), true),
             // ("enterprise license c", Some(enterprise_license), Duration::from_secs(-1 * hours_to_seconds), true),
-            #[allow(clippy::erasing_op)]
-            ("broken license", Some(broken_license), Duration::from_secs(0 * hours_to_seconds), false),
+            ("broken license", Some(broken_license), Duration::seconds(0), false),
         ].into_iter()
             .map(|t| Test{ name: t.0.to_string(), license: t.1, used_time: t.2, expected: t.3 })
             .collect();
