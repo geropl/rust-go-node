@@ -514,6 +514,7 @@ mod tests {
         let tests:Vec<Test> = vec![
             ("default license ok", None, Duration::from_secs(0), true),
             ("default license not ok", None, Duration::from_secs(250 * hours_to_seconds), false),
+            #[allow(clippy::identity_op)]
             ("enterprise license a", Some(enterprise_license.clone()), Duration::from_secs(1 * hours_to_seconds), true),
             ("enterprise license b", Some(enterprise_license), Duration::from_secs(500 * hours_to_seconds), true),
             // ("enterprise license c", Some(enterprise_license), Duration::from_secs(-1 * hours_to_seconds), true),
