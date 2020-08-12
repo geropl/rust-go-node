@@ -26,7 +26,7 @@ sha2 = { version = "0.9.1", default-features = false }
 rsa = { git = "https://github.com/RustCrypto/RSA", rev = "e8152949f921fdb24efbeb0c27cba5bccfc8d4fc", default-features = false, features = ["std", "pem"] }
 
 # cli (use unreleased v3.0.0)
-clap = { git = "https://github.com/clap-rs/clap/", rev = "bbb14f8bd47ef201b315d367922343577ee60718", default-features = false, features = ["derive", "std"] }
+clap = { git = "https://github.com/clap-rs/clap/", rev = "bbb14f8bd47ef201b315d367922343577ee60718", default-features = false, features = ["derive", "std"], optional = true }
 
 # needed for non-trivial static initializations until Rust has it's compile-time evaluation beefed up
 lazy_static = { version = "1.4.0", default-features = false }
@@ -35,3 +35,8 @@ lazy_static = { version = "1.4.0", default-features = false }
 chrono = { version = "0.4.13", default-features = false, features = ["serde"] }
 rand = { version = "0.7.3", default-features = false }
 base64 = { version = "0.12.3", default-features = false }
+
+
+[features]
+default = [ "cli" ]
+cli = [ "clap" ]
