@@ -1,0 +1,5 @@
+{
+    "scripts": {
+        "build": "rm -Rf typescript && wasm-pack build --target nodejs --out-dir typescript && rm typescript/.gitignore"
+    }
+}

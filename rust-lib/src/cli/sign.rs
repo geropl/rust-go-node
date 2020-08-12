@@ -51,7 +51,7 @@ pub fn sign(params: SignParams) -> Result<(), anyhow::Error> {
     let private_key = RSAPrivateKey::from_pkcs1(&pem.contents)?;
 
     // construct license
-    let level = lib::LicenseLevel::try_from(params.level)?;
+    let level = lib::LicenseLevel::try_from(params.level.as_str())?;
     let valid_until = Utc::now().checked_add_signed(params.valid_for)
         .ok_or_else(|| anyhow!("error calculating valid_until"))?;
     let license = lib::License {

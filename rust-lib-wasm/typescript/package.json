@@ -1,0 +1,15 @@
+{
+  "name": "rust-lib-wasm",
+  "collaborators": [
+    "Gero Posmyk-Leinemann <gero.posmyk-leinemann@typefox.io>"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "rust_lib_wasm_bg.wasm",
+    "rust_lib_wasm.js",
+    "rust_lib_wasm_bg.js",
+    "rust_lib_wasm.d.ts"
+  ],
+  "main": "rust_lib_wasm.js",
+  "types": "rust_lib_wasm.d.ts"
+}

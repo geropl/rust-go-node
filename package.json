@@ -3,7 +3,7 @@
     "license": "MIT",
     "workspaces": {
         "packages": [
-            "rust-lib-wasm/pkg",
+            "rust-lib-wasm/typescript",
             "nodejs"
         ]
     }

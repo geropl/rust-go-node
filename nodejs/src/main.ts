@@ -1,5 +1,11 @@
-import * as rustLib from 'rust-lib-wasm';
+import { Evaluator } from 'rust-lib-wasm';
 
-console.log("starting computation...");
-const result = rustLib.concatenate_strings("a", "b");
-console.log(`done computing, result: '${result}'`);
+let evaluator: Evaluator | undefined;
+try {
+    evaluator = Evaluator.createFromLicenseKey("", "");
+    console.log(`done computing, result: '${evaluator.inspect()}'`);
+} finally {
+    if (evaluator) {
+        evaluator.free();
+    }
+}
