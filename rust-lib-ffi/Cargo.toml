@@ -8,5 +8,10 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-libc = "0.2.2"
 rust-lib = { path = "../rust-lib" }
+
+# ffi
+libc = "0.2.2"
+
+# misc
+chrono = { version = "0.4.13", default-features = false }

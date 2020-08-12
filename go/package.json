@@ -1,0 +1,6 @@
+{
+    "scripts": {
+        "install": "mkdir -p ./lib && rm -rf ./lib/* && cp ../target/release/librust_lib_ffi.so ./lib/ && cp ../rust-lib-ffi/headers/* ./lib/",
+        "build": "go build -ldflags=\"-r lib\" main.go"
+    }
+}
