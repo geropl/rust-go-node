@@ -108,10 +108,8 @@ pub struct License {
     pub id: String,
     pub level: LicenseLevel,
 
-    /// None means: no restriction
     pub domain: String,
 
-    /// None means: no restriction
     pub valid_until: DateTime<Utc>,
 
 	/// None means: there's no seat limit
@@ -131,6 +129,7 @@ lazy_static!{
     };
 }
 
+// TODO maybe it'd make sense to model SignedLicense as Enum(SignedLicense | DefaultLicense)
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignedLicense {
     pub license: License,

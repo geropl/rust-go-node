@@ -10,10 +10,10 @@ use libc::c_char;
 use chrono::Duration;
 
 /// It turns out that:
-///  - cbindgen does not support:
-///    - tuple return types (why?) => no Go-style results
-///  - cgo does not support:
-///    - unions (because Go does not have the), to which Rust enums are translated to => no Rust-style return types
+///  - cbindgen does not support tuple return types (why?)
+///     => no Go-style results
+///  - cgo does not support unions (because Go does not have them), to which Rust enums are translated to
+///     => no Rust-style return types
 /// This makes this a tad more cumbersome than expected as we have to manually implement our Result type
 #[repr(C)]
 pub struct Result {
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn free_bool_result(result: BoolResult) {
     }
 }
 
-/// We need the extra-indirection so we don't need to expose Evaluator's layout. This translates to an typedef
+/// We need the extra-indirection so we don't need to expose Evaluator's layout (this translates to an typedef).
 pub struct Eval(Evaluator);
 
 /// This creates a new Evaluator for the given key and domain to check against
